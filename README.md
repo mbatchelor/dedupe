@@ -10,9 +10,17 @@ Building
 
 The build has been tested with Gradle 1.7 and Oracle's JDK 1.6 but should work fine with an older Gradle version (very simple build logic) and any JDK 1.6 or newer.
 
-Run gradle build in the root directory.  The resulting jar will show up in build/libs.
+Run 
+
+    gradle build
+
+in the root directory.  The resulting jar will show up in build/libs.
 
 Usage
 =====
 
-Please run java -jar dedupe.jar for usage help.
+Please run 
+
+    java -jar dedupe.jar -h 
+
+for usage help.
