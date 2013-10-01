@@ -24,3 +24,8 @@ Please run
     java -jar dedupe.jar -h 
 
 for usage help.
+
+Roadmap
+=======
+
+Next on the feature list will be the ability to use symbolic links in the "redupe" process if the operating system supports them.
