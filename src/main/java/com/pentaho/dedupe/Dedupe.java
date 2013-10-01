@@ -7,7 +7,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLDecoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -43,14 +42,15 @@ public class Dedupe {
   };
 
   private final File rootDirectory;
+
   private final File dedupFolder;
+
   private final File thisFile;
 
   public Dedupe(File rootDirectory, File dedupFolder) throws URISyntaxException {
     this.rootDirectory = rootDirectory.getAbsoluteFile();
     this.dedupFolder = dedupFolder.getAbsoluteFile();
-    thisFile = new File(Dedupe.class.getProtectionDomain().getCodeSource()
-        .getLocation().toURI());
+    thisFile = new File(Dedupe.class.getProtectionDomain().getCodeSource().getLocation().toURI());
   }
 
   private Set<Pair<String, File>> getAllFiles(URI rootUri, File rootDirectory) {
@@ -62,8 +62,8 @@ public class Dedupe {
           if (file.isDirectory()) {
             result.addAll(getAllFiles(rootUri, file));
           } else if (!file.getAbsoluteFile().equals(thisFile)) {
-            result.add(new Pair<String, File>(rootUri.relativize(file.toURI())
-                .toString(), file.getAbsoluteFile(), HASH_IMPL));
+            result.add(new Pair<String, File>(rootUri.relativize(file.toURI()).toString(), file.getAbsoluteFile(),
+                HASH_IMPL));
           }
         }
       }
@@ -73,29 +73,25 @@ public class Dedupe {
 
   public void dedupe() throws NoSuchAlgorithmException, IOException {
     if (dedupFolder.exists()) {
-      throw new IOException(
-          "Dedup output folder exists already, refusing to continue.");
+      throw new IOException("Dedup output folder exists already, refusing to continue.");
     }
     dedupFolder.mkdirs();
     MessageDigest md = MessageDigest.getInstance("SHA1");
-    Set<Pair<String, File>> pairs = getAllFiles(rootDirectory.toURI(),
-        rootDirectory);
+    Set<Pair<String, File>> pairs = getAllFiles(rootDirectory.toURI(), rootDirectory);
     List<String> mappings = new ArrayList<String>(pairs.size());
     for (Pair<String, File> pair : pairs) {
       String sha1 = FileUtil.getHexDigest(md, pair.getSecond());
       File dedupFile = new File(dedupFolder.getAbsolutePath() + "/" + sha1);
       if (!dedupFile.exists()) {
         if (!pair.getSecond().renameTo(dedupFile)) {
-          throw new IOException("Couldn't move " + pair.getSecond() + " to "
-              + dedupFile);
+          throw new IOException("Couldn't move " + pair.getSecond() + " to " + dedupFile);
         }
       } else if (!pair.getSecond().delete()) {
         throw new IOException("Couldn't delete " + pair.getSecond());
       }
       mappings.add(pair.getFirst() + "\n" + sha1);
     }
-    FileWriter fileWriter = new FileWriter(dedupFolder.getAbsolutePath()
-        + "/manifest");
+    FileWriter fileWriter = new FileWriter(dedupFolder.getAbsolutePath() + "/manifest");
     try {
       for (String mapping : mappings) {
         fileWriter.write(mapping);
@@ -106,10 +102,9 @@ public class Dedupe {
     }
   }
 
-  public void redupe() throws IOException {
+  public void redupe() throws IOException, URISyntaxException {
     if (!dedupFolder.exists()) {
-      throw new IOException(
-          "Dedup output folder doesn't exist, refusing to continue.");
+      throw new IOException("Dedup output folder doesn't exist, refusing to continue.");
     }
     Map<String, List<String>> outputMap = new HashMap<String, List<String>>();
     File manifest = new File(dedupFolder.getAbsolutePath() + "/manifest");
@@ -127,7 +122,7 @@ public class Dedupe {
             paths = new ArrayList<String>();
             outputMap.put(sha1, paths);
           }
-          paths.add(URLDecoder.decode(path, "UTF-8"));
+          paths.add(path);
         }
       }
     } finally {
@@ -141,30 +136,24 @@ public class Dedupe {
       File sha1File = new File(dedupFolder.getAbsolutePath() + "/" + sha1);
       List<String> paths = entry.getValue();
       for (int i = 0; i < paths.size() - 1; i++) {
-        FileUtil.copy(sha1File, new File(rootDirectory.getAbsolutePath() + "/"
-            + paths.get(i)));
+        FileUtil.copy(sha1File, new File(rootDirectory.toURI().resolve(paths.get(i))));
       }
-      if (!sha1File.renameTo(new File(rootDirectory.getAbsolutePath() + "/"
-          + paths.get(paths.size() - 1)))) {
-        throw new IOException("Unable to rename " + sha1File + " to "
-            + paths.get(paths.size() - 1));
+      if (!sha1File.renameTo(new File(rootDirectory.toURI().resolve(paths.get(paths.size() - 1))))) {
+        throw new IOException("Unable to rename " + sha1File + " to " + paths.get(paths.size() - 1));
       }
     }
     manifest.delete();
     dedupFolder.delete();
   }
 
-  public static void main(String[] args) throws NoSuchAlgorithmException,
-      IOException, URISyntaxException {
+  public static void main(String[] args) throws NoSuchAlgorithmException, IOException, URISyntaxException {
     ArgParser argParser = new ArgParser();
-    Arg<File> rootDir = new Arg<File>(new StandardFlag("r", "rootDir",
-        "The root directory to deduplicate"), new FolderParser(),
-        new File("").getAbsoluteFile());
-    Arg<File> dedupeDir = new Arg<File>(new StandardFlag("d", "dedupeDir",
-        "The directory to store the deduplication"), new FolderParser());
+    Arg<File> rootDir = new Arg<File>(new StandardFlag("r", "rootDir", "The root directory to deduplicate"),
+        new FolderParser(), new File("").getAbsoluteFile());
+    Arg<File> dedupeDir = new Arg<File>(new StandardFlag("d", "dedupeDir", "The directory to store the deduplication"),
+        new FolderParser());
     Arg<String> operation = new Arg<String>(new StandardFlag("o", "operation",
-        "The operation to perform (either dedupe or redupe)"),
-        new StringParser(), "redupe");
+        "The operation to perform (either dedupe or redupe)"), new StringParser(), "redupe");
     argParser.register(rootDir);
     argParser.register(dedupeDir);
     argParser.register(operation);
