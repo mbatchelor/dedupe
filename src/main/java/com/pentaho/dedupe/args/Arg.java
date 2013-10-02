@@ -1,10 +1,15 @@
 package com.pentaho.dedupe.args;
 
+import com.pentaho.dedupe.args.flags.Flag;
 import com.pentaho.dedupe.args.parsers.Parser;
 
 public class Arg<T> {
   private final Flag flag;
+
   private final Parser<T> parser;
+
+  private final T defaultValue;
+
   private T value;
 
   public T get() {
@@ -27,6 +32,7 @@ public class Arg<T> {
     this.flag = flag;
     this.parser = parser;
     this.value = defaultValue;
+    this.defaultValue = defaultValue;
   }
 
   public Arg(Flag flag, Parser<T> parser) {
@@ -35,6 +41,7 @@ public class Arg<T> {
 
   @Override
   public String toString() {
-    return flag + "(type: " + parser + ")";
+    return flag + " (" + (this.defaultValue == null ? "" : "Default: " + this.defaultValue + ", ") + "type: " + parser
+        + ")";
   }
 }

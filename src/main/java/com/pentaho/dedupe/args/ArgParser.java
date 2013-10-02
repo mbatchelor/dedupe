@@ -3,6 +3,7 @@ package com.pentaho.dedupe.args;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.pentaho.dedupe.args.flags.Flag;
 import com.pentaho.dedupe.args.flags.StandardFlag;
 import com.pentaho.dedupe.args.parsers.Parser;
 
@@ -33,8 +34,17 @@ public class ArgParser {
     }));
   }
   
-  public void register(Arg<?> arg) {
+  public <T> Arg<T> register(Arg<T> arg) {
     args.add(arg);
+    return arg;
+  }
+  
+  public <T> Arg<T> register(Flag flag, Parser<T> parser) {
+    return register(new Arg<T>(flag, parser));
+  }
+  
+  public <T> Arg<T> register(Flag flag, Parser<T> parser, T defaultValue) {
+    return register(new Arg<T>(flag, parser, defaultValue));
   }
   
   private Arg<?> getArg(String value) {

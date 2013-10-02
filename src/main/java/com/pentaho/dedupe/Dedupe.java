@@ -20,6 +20,7 @@ import java.util.Set;
 import com.pentaho.dedupe.args.Arg;
 import com.pentaho.dedupe.args.ArgParser;
 import com.pentaho.dedupe.args.flags.StandardFlag;
+import com.pentaho.dedupe.args.parsers.BooleanParser;
 import com.pentaho.dedupe.args.parsers.FolderParser;
 import com.pentaho.dedupe.args.parsers.StringParser;
 import com.pentaho.dedupe.containers.Pair;
@@ -71,7 +72,7 @@ public class Dedupe {
     return result;
   }
 
-  public void dedupe() throws NoSuchAlgorithmException, IOException {
+  public void dedupe(boolean preserveExtensions) throws NoSuchAlgorithmException, IOException {
     if (dedupFolder.exists()) {
       throw new IOException("Dedup output folder exists already, refusing to continue.");
     }
@@ -80,8 +81,15 @@ public class Dedupe {
     Set<Pair<String, File>> pairs = getAllFiles(rootDirectory.toURI(), rootDirectory);
     List<String> mappings = new ArrayList<String>(pairs.size());
     for (Pair<String, File> pair : pairs) {
-      String sha1 = FileUtil.getHexDigest(md, pair.getSecond());
-      File dedupFile = new File(dedupFolder.getAbsolutePath() + "/" + sha1);
+      String dedupFileName = FileUtil.getHexDigest(md, pair.getSecond());
+      if (preserveExtensions) {
+        String fileName = pair.getSecond().getName();
+        int index = fileName.indexOf('.');
+        if (index >= 0) {
+          dedupFileName += fileName.substring(index);
+        }
+      }
+      File dedupFile = new File(dedupFolder.toURI().resolve(dedupFileName));
       if (!dedupFile.exists()) {
         if (!pair.getSecond().renameTo(dedupFile)) {
           throw new IOException("Couldn't move " + pair.getSecond() + " to " + dedupFile);
@@ -89,7 +97,7 @@ public class Dedupe {
       } else if (!pair.getSecond().delete()) {
         throw new IOException("Couldn't delete " + pair.getSecond());
       }
-      mappings.add(pair.getFirst() + "\n" + sha1);
+      mappings.add(pair.getFirst() + "\n" + dedupFileName);
     }
     FileWriter fileWriter = new FileWriter(dedupFolder.getAbsolutePath() + "/manifest");
     try {
@@ -107,7 +115,7 @@ public class Dedupe {
       throw new IOException("Dedup output folder doesn't exist, refusing to continue.");
     }
     Map<String, List<String>> outputMap = new HashMap<String, List<String>>();
-    File manifest = new File(dedupFolder.getAbsolutePath() + "/manifest");
+    File manifest = new File(dedupFolder.toURI().resolve("manifest"));
     FileReader fileReader = new FileReader(manifest);
     BufferedReader br = null;
     try {
@@ -132,8 +140,8 @@ public class Dedupe {
       fileReader.close();
     }
     for (Entry<String, List<String>> entry : outputMap.entrySet()) {
-      String sha1 = entry.getKey();
-      File sha1File = new File(dedupFolder.getAbsolutePath() + "/" + sha1);
+      String fileName = entry.getKey();
+      File sha1File = new File(dedupFolder.toURI().resolve(fileName));
       List<String> paths = entry.getValue();
       for (int i = 0; i < paths.size() - 1; i++) {
         FileUtil.copy(sha1File, new File(rootDirectory.toURI().resolve(paths.get(i))));
@@ -148,22 +156,21 @@ public class Dedupe {
 
   public static void main(String[] args) throws NoSuchAlgorithmException, IOException, URISyntaxException {
     ArgParser argParser = new ArgParser();
-    Arg<File> rootDir = new Arg<File>(new StandardFlag("r", "rootDir", "The root directory to deduplicate"),
+    Arg<File> rootDir = argParser.register(new StandardFlag("r", "rootDir", "The root directory to deduplicate"),
         new FolderParser(), new File("").getAbsoluteFile());
-    Arg<File> dedupeDir = new Arg<File>(new StandardFlag("d", "dedupeDir", "The directory to store the deduplication"),
-        new FolderParser());
-    Arg<String> operation = new Arg<String>(new StandardFlag("o", "operation",
+    Arg<File> dedupeDir = argParser.register(new StandardFlag("d", "dedupeDir",
+        "The directory to store the deduplication, rootDir/dedupe by default"), new FolderParser());
+    Arg<String> operation = argParser.register(new StandardFlag("o", "operation",
         "The operation to perform (either dedupe or redupe)"), new StringParser(), "redupe");
-    argParser.register(rootDir);
-    argParser.register(dedupeDir);
-    argParser.register(operation);
+    Arg<Boolean> preserveExtensions = argParser.register(new StandardFlag("p", "preserveExtensions",
+        "Preserve the extension of the files, only relevant during deduplication"), new BooleanParser(), false);
     argParser.parse(args);
     if (dedupeDir.get() == null) {
-      dedupeDir.process(rootDir.get().getAbsolutePath() + "/dedupe");
+      dedupeDir.process(new File(rootDir.get().toURI().resolve("dedupe")).getAbsolutePath());
     }
     Dedupe dedupe = new Dedupe(rootDir.get(), dedupeDir.get());
     if (operation.get().equals("dedupe")) {
-      dedupe.dedupe();
+      dedupe.dedupe(preserveExtensions.get());
     } else if (operation.get().equals("redupe")) {
       dedupe.redupe();
     } else {

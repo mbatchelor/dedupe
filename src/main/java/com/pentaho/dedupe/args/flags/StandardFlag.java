@@ -1,6 +1,5 @@
 package com.pentaho.dedupe.args.flags;
 
-import com.pentaho.dedupe.args.Flag;
 
 public class StandardFlag implements Flag {
   private final String abbreviatedArg;
